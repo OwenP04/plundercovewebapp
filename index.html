@@ -1,73 +1,49 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Plunder Cove - Pirate Adventure Theme Park</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body {
-      background: linear-gradient(to bottom, #87CEEB, #1E90FF);
-      font-family: Arial, sans-serif;
-    }
-    .pirate-header {
-      background: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80') no-repeat center;
-      background-size: cover;
-      color: white;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-    }
-    .mascot-section {
-      background: rgba(255, 215, 0, 0.2);
-      border: 2px solid #FFD700;
-    }
-  </style>
-</head>
-<body class="min-h-screen flex flex-col">
-  <!-- Header Section -->
-  <header class="pirate-header py-16 text-center">
-    <h1 class="text-5xl font-bold">Welcome to Plunder Cove!</h1>
-    <p class="mt-4 text-xl">Set sail for adventure at the ultimate pirate-themed theme park!</p>
-  </header>
+resource "aws_ecs_cluster" "plunder_cove" {
+  name = "plunder-cove-cluster"
+}
 
-  <!-- Attractions Section -->
-  <section class="flex-grow p-8">
-    <h2 class="text-3xl font-bold text-center text-white mb-8">Our Attractions</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <div class="bg-white rounded-lg shadow-lg p-6 text-center">
-        <h3 class="text-xl font-semibold">Kraken’s Wrath</h3>
-        <p class="mt-2 text-gray-700">A thrilling rollercoaster that plunges you into the depths of the Kraken’s lair!</p>
-      </div>
-      <div class="bg-white rounded-lg shadow-lg p-6 text-center">
-        <h3 class="text-xl font-semibold">Treasure Hunt</h3>
-        <p class="mt-2 text-gray-700">Seek hidden treasures with Captain Bootstrap Bill in an interactive adventure!</p>
-      </div>
-      <div class="bg-white rounded-lg shadow-lg p-6 text-center">
-        <h3 class="text-xl font-semibold">Cannon Barrage</h3>
-        <p class="mt-2 text-gray-700">A live show with explosive pirate battles and daring stunts!</p>
-      </div>
-      <div class="bg-white rounded-lg shadow-lg p-6 text-center">
-        <h3 class="text-xl font-semibold">Siren’s Lagoon</h3>
-        <p class="mt-2 text-gray-700">Relax in a lazy river surrounded by mythical sirens and tropical scenery.</p>
-      </div>
-    </div>
-  </section>
+resource "aws_ecr_repository" "plunder_app" {
+  name = "plunder-cove-web"
+}
 
-  <!-- Mascot Section -->
-  <section class="mascot-section p-8 text-center">
-    <h2 class="text-3xl font-bold text-gray-800 mb-4">Meet Captain Bootstrap Bill</h2>
-    <p class="text-lg text-gray-700 max-w-2xl mx-auto">Our cheerful mascot, Captain Bootstrap Bill, welcomes you with his navy-blue coat and floppy tricorn hat! Join him for Bootstrap’s Map Quest and uncover the wonders of Plunder Cove.</p>
-    <button id="treasureHuntBtn" class="mt-6 bg-yellow-600 text-white px-6 py-3 rounded-lg hover:bg-yellow-700 transition">Join the Treasure Hunt!</button>
-  </section>
+resource "aws_ecs_task_definition" "web_task" {
+  family                   = "plunder-web-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
 
-  <!-- Footer -->
-  <footer class="bg-gray-800 text-white text-center py-4">
-    <p>&copy; 2025 Plunder Cove. All rights reserved.</p>
-  </footer>
+  container_definitions = jsonencode([{
+    name      = "plunder-cove"
+    image     = "<your_ecr_image_uri>"
+    portMappings = [{
+      containerPort = 80
+      protocol      = "tcp"
+    }]
+  }])
 
-  <script>
-    document.getElementById('treasureHuntBtn').addEventListener('click', () => {
-      window.location.href = 'treasure-hunt.html';
-    });
-  </script>
-</body>
-</html>
+  execution_role_arn = aws_iam_role.ecs_task_exec.arn
+  task_role_arn      = aws_iam_role.ecs_task.arn
+}
+
+resource "aws_ecs_service" "web_service" {
+  name            = "plunder-web-service"
+  cluster         = aws_ecs_cluster.plunder_cove.id
+  task_definition = aws_ecs_task_definition.web_task.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets         = [<your_subnet_ids>]
+    assign_public_ip = true
+    security_groups  = [<your_security_group_ids>]
+  }
+
+  load_balancer {
+    target_group_arn = <your_target_group_arn>
+    container_name   = "plunder-cove"
+    container_port   = 80
+  }
+
+  depends_on = [<your_lb_dependencies>]
+}
